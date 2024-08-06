@@ -1,19 +1,20 @@
 package ru.kata.spring.boot_security.demo.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
-import ru.kata.spring.boot_security.demo.model.Role;
 import ru.kata.spring.boot_security.demo.model.User;
 import ru.kata.spring.boot_security.demo.servise.RoleService;
 import ru.kata.spring.boot_security.demo.servise.UserService;
 
 import javax.validation.Valid;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Collectors;
+
 
 @Controller
 @RequestMapping(value = "/admin")
@@ -30,62 +31,40 @@ public class AdminController {
 
     @GetMapping
     public String printUsers(Model model) {
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         model.addAttribute("users", userService.getAllUsers());
-
+        model.addAttribute("user", user);
+        model.addAttribute("newUser", new User());
         return "/admin";
     }
 
-    @GetMapping("/new")
-    public String createUserIndex(@ModelAttribute("user") User user, Model model) {
-        model.addAttribute("roles", roleService.getAllRoles());
-
-        return "new";
-    }
-
-    @PostMapping()
-    public String createUser(@ModelAttribute("user") @Valid User user, BindingResult result, @RequestParam List<Long> roles, Model model) {
+    @PostMapping("/new")
+    public String addNewUser(@Valid @ModelAttribute("newUser") User user, BindingResult result, @RequestParam("roles") ArrayList<Long> roles, Model model) {
         if (result.hasErrors()) {
-            model.addAttribute("roles", roleService.getAllRoles());
-            return "new";
+            // Добавить существующих пользователей и роль в модель для повторного отображения формы
+            model.addAttribute("users", userService.getAllUsers());
+            model.addAttribute("user", SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+            return "/admin";
         }
-
-        Set<Role> userRoles = new HashSet<>();
-        for (long roleId : roles) {
-            userRoles.add(roleService.getRole(roleId));
-        }
-        user.setRoles(userRoles);
+        user.setRoles(roles.stream().map(roleService::getRole).collect(Collectors.toSet()));
         userService.addUser(user);
-
         return "redirect:/admin";
     }
 
-    @GetMapping(value = "/{id}/update")
-    public String updateIndexUser(@PathVariable("id") long id, Model model) {
-        model.addAttribute("user", userService.getUser(id));
-        model.addAttribute("roles", roleService.getAllRoles());
-
-        return "/update";
-    }
-
     @PutMapping("/update/{id}")
-    public String updateUser(@ModelAttribute("user") @Valid User user, BindingResult result, @RequestParam List<Long> roles, Model model) {
+    public String updateUser(@PathVariable("id") long id, @Valid @ModelAttribute("user") User user, BindingResult result, @RequestParam("roles") List<Long> roles) {
         if (result.hasErrors()) {
-            model.addAttribute("roles", roleService.getAllRoles());
-            return "/update";
+            // Добавить существующих пользователей и роль в модель для повторного отображения формы
+            return "/admin";
         }
-
-        Set<Role> userRoles = new HashSet<>();
-        for (long roleId : roles) {
-            userRoles.add(roleService.getRole(roleId));
-        }
-        user.setRoles(userRoles);
+        user.setRoles(roles.stream().map(roleService::getRole).collect(Collectors.toSet()));
         userService.updateUser(user);
 
         return "redirect:/admin";
     }
 
-    @DeleteMapping(value = "/{id}")
-    public String delete(@PathVariable("id") Long id) {
+    @DeleteMapping(value = "/delete/{id}")
+    public String delete(@PathVariable("id") long id) {
         userService.deleteUser(id);
 
         return "redirect:/admin";

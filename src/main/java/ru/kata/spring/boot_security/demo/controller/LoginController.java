@@ -20,8 +20,10 @@ public class LoginController {
 
     @GetMapping("/login")
     public ModelAndView loginPage() {
+        ModelAndView modelAndView = new ModelAndView();
+        modelAndView.setViewName("login");
 
-        return new ModelAndView();
+        return modelAndView;
     }
 
     @PostConstruct
